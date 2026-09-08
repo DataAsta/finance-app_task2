@@ -31,9 +31,11 @@
   Никаких дополнительных зависимостей или серверов не требуется – всё работает локально.
 
 **Скриншоты**  
-Вкладка «Проекты» https://screenshots/projects.png  
-Вкладка «Доходы / Расходы» https://screenshots/transactions.png  
-Дашборд https://screenshots/dashboard.png
+Вкладка «Проекты» <img width="1428" height="854" alt="projects" src="https://github.com/user-attachments/assets/20608894-c70e-48bf-bef2-3ea5972fcaeb" />
+Вкладка «Доходы <img width="1452" height="1003" alt="transactions" src="https://github.com/user-attachments/assets/4ef8e739-14a8-46c6-9c83-05a7672c3a16" />
+
+Дашборд <img width="1079" height="992" alt="dashboard" src="https://github.com/user-attachments/assets/358e45d2-a6a3-4756-a0b0-6d174f743a5c" />
+
 
 **Технологии**  
 HTML5 – структура страницы.  
