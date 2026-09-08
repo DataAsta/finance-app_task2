@@ -27,7 +27,7 @@
    ```bash
    git clone https://github.com/DataAsta/finance-app_task2.git
 
-2. Откройте файл index.html в любом современном браузере (Chrome, Edge, Firefox).  
+2. Откройте файл miftAN_task2.html в любом современном браузере (Chrome, Edge, Firefox).  
   Никаких дополнительных зависимостей или серверов не требуется – всё работает локально.
 
 **Скриншоты**  
