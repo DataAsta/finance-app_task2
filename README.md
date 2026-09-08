@@ -33,7 +33,7 @@
 **Скриншоты**  
 Вкладка «Проекты» https://screenshots/projects.png  
 Вкладка «Доходы / Расходы» https://screenshots/transactions.png  
-Дашборд https://screenshots/dashboard.png
+Дашборд screenshots/dashboard.png
 
 **Технологии**  
 HTML5 – структура страницы.  
