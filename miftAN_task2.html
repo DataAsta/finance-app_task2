@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учёт доходов/расходов по проектам</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* Все стили остаются такими же, как в предыдущей версии,
+           я лишь добавлю пару новых стилей для улучшения интерфейса */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            background: #f4f7fc;
+            padding: 20px;
+            color: #1e2a3a;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+            padding: 30px;
+        }
+        h1 {
+            font-weight: 600;
+            font-size: 28px;
+            margin-bottom: 6px;
+            color: #0b1a33;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .subtitle {
+            color: #5e6f8d;
+            font-size: 14px;
+            margin-bottom: 25px;
+            border-left: 4px solid #2a7de1;
+            padding-left: 14px;
+            background: #f0f5ff;
+            border-radius: 0 8px 8px 0;
+            line-height: 1.6;
+        }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 2px solid #e9edf4;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            padding: 10px 22px;
+            border: none;
+            background: transparent;
+            font-weight: 500;
+            font-size: 15px;
+            color: #5e6f8d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: 0.2s;
+            border-radius: 8px 8px 0 0;
+        }
+        .tab-btn:hover { background: #f0f5ff; color: #1e2a3a; }
+        .tab-btn.active {
+            color: #1e2a3a;
+            border-bottom-color: #2a7de1;
+            background: #f0f5ff;
+        }
+        .tab-content { display: none; animation: fade 0.25s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fade { from { opacity: 0.4; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .card {
+            background: #f9fbfe;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #e9edf4;
+            transition: 0.15s;
+        }
+        .card:hover { border-color: #cdd6e4; }
+        .card h3 {
+            font-weight: 600;
+            font-size: 17px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        label {
+            font-weight: 500;
+            font-size: 13px;
+            color: #2d3a52;
+            display: block;
+            margin: 12px 0 4px;
+        }
+        input, select, button { font-family: inherit; font-size: 14px; }
+        input, select {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #d0d8e5;
+            border-radius: 10px;
+            background: white;
+            transition: 0.15s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #2a7de1;
+            box-shadow: 0 0 0 3px rgba(42,125,225,0.12);
+        }
+        .btn {
+            padding: 9px 18px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 500;
+            background: #e9edf4;
+            color: #1e2a3a;
+            cursor: pointer;
+            transition: 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        .btn-primary { background: #2a7de1; color: white; }
+        .btn-primary:hover { background: #1a66c0; }
+        .btn-success { background: #1d9b5d; color: white; }
+        .btn-success:hover { background: #15804b; }
+        .btn-danger { background: #e14a4a; color: white; }
+        .btn-danger:hover { background: #c03333; }
+        .btn-outline { background: transparent; border: 1px solid #d0d8e5; }
+        .btn-outline:hover { background: #f0f5ff; }
+        .btn-sm { padding: 5px 12px; font-size: 13px; }
+        .mt-2 { margin-top: 12px; }
+        .mb-1 { margin-bottom: 8px; }
+        .mb-2 { margin-bottom: 12px; }
+        .mt-3 { margin-top: 24px; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .inline-flex { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .badge {
+            background: #e9edf4;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 500;
+            display: inline-block;
+        }
+        .badge-success { background: #d4edda; color: #0b5e3a; }
+        .badge-danger { background: #f8d7da; color: #a12b2b; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th { text-align: left; padding: 10px 8px 6px 0; font-weight: 600; color: #2d3a52; border-bottom: 1px solid #e0e5ed; }
+        td { padding: 8px 8px 8px 0; border-bottom: 1px solid #edf0f6; vertical-align: middle; }
+        .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .empty-state { color: #7a8aa5; padding: 30px 0; text-align: center; }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px,1fr));
+            gap: 16px;
+            margin: 16px 0;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 14px;
+            padding: 14px 18px;
+            border: 1px solid #e9edf4;
+            text-align: center;
+        }
+        .stat-card .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
+        .stat-card .label { font-size: 13px; color: #5e6f8d; }
+
+        .monthly-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .monthly-summary .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px 20px;
+            border: 1px solid #e9edf4;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+        .monthly-summary .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .monthly-summary .stat-card .label {
+            font-size: 14px;
+            color: #5e6f8d;
+            font-weight: 500;
+        }
+        .monthly-summary .stat-card .sub {
+            font-size: 12px;
+            color: #8a9bb5;
+            margin-top: 2px;
+        }
+
+        .profit-positive { color: #1d9b5d; }
+        .profit-negative { color: #e14a4a; }
+
+        .chart-container {
+            margin-top: 20px;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #e9edf4;
+        }
+        .chart-container canvas { max-height: 300px; max-width: 100%; }
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 20px;
+        }
+        .chart-box {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid #e9edf4;
+            text-align: center;
+        }
+        .chart-box canvas { max-height: 220px; max-width: 100%; }
+        .chart-box h5 { margin-bottom: 10px; color: #2d3a52; font-weight: 600; }
+
+        /* ===== ДАШБОРД: ТОЛЬКО ОДИН РЯД КАРТОЧЕК + СКРОЛЛ ===== */
+        #dashboard-container {
+            max-height: 220px;
+            overflow-y: auto;
+            padding-right: 6px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+        .project-card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid #e9edf4;
+            transition: 0.15s;
+            display: flex;
+            flex-direction: column;
+        }
+        .project-card:hover {
+            border-color: #cdd6e4;
+        }
+        .project-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .project-card .manager {
+            font-size: 13px;
+            color: #5e6f8d;
+            margin-bottom: 10px;
+        }
+        .project-card .stat-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 0;
+        }
+        .project-card .stat-card {
+            padding: 8px 6px;
+            border: none;
+            background: #f4f7fc;
+            border-radius: 10px;
+        }
+        .project-card .stat-card .value {
+            font-size: 18px;
+        }
+        .project-card .stat-card .label {
+            font-size: 11px;
+        }
+        #dashboard-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        #dashboard-container::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 8px;
+        }
+        #dashboard-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        /* Новые стили для улучшения интерфейса добавления статей */
+        .custom-article-block {
+            background: #f4f7fc;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin: 8px 0 4px 0;
+            border-left: 3px solid #2a7de1;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+        }
+        .custom-article-block label {
+            margin: 0;
+            font-size: 12px;
+            color: #5e6f8d;
+            width: 100%;
+        }
+        .custom-article-block input {
+            flex: 1;
+            min-width: 120px;
+            padding: 6px 10px;
+            border: 1px solid #d0d8e5;
+            border-radius: 8px;
+            background: white;
+        }
+        .custom-article-block .btn {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+        .custom-article-block .hint {
+            font-size: 11px;
+            color: #8a9bb5;
+            margin-top: 2px;
+            width: 100%;
+        }
+        .separator {
+            border: none;
+            border-top: 1px dashed #d0d8e5;
+            margin: 12px 0 8px 0;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 440px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            animation: fade 0.2s ease;
+        }
+        .modal h2 {
+            font-weight: 600;
+            font-size: 22px;
+            margin-bottom: 16px;
+        }
+        .modal .form-group {
+            margin-bottom: 18px;
+        }
+        .modal .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        .modal .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #d0d8e5;
+            border-radius: 10px;
+            font-size: 15px;
+        }
+        .modal .btn-row {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 6px;
+        }
+
+        @media (max-width: 700px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .chart-row { grid-template-columns: 1fr; }
+            .container { padding: 16px; }
+            #dashboard-container {
+                max-height: 280px;
+                grid-template-columns: 1fr;
+            }
+            .monthly-summary {
+                grid-template-columns: 1fr 1fr;
+            }
+            .monthly-summary .stat-card:last-child {
+                grid-column: span 2;
+            }
+            .custom-article-block {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+		/* Названия проектов на вкладке "Проекты" – синие, как Битрикс24 */
+			#project-list .card strong {
+			color: #1a5b9c;
+			}
+    </style>
+</head>
+<body>
+<div class="container" id="app">
+<div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 6px;">
+    <span style="font-weight: 700; font-size: 28px; color: #1a5b9c; letter-spacing: -0.5px;">
+        Битрикс24
+    </span>
+    <span style="font-weight: 300; font-size: 28px; color: #5e6f8d;">|</span>
+    <h1 style="margin: 0; font-size: 28px;">📊 Финансовый учёт проектов</h1>
+</div>
+<div class="subtitle">Доходы, расходы, прибыль и рентабельность по каждому проекту. Данные хранятся в вашем браузере.</div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-projects">📁 Проекты</button>
+        <button class="tab-btn" data-tab="tab-transactions">💰 Доходы / Расходы</button>
+        <button class="tab-btn" data-tab="tab-dashboard">📈 Дашборд</button>
+    </div>
+
+    <!-- ===== Вкладка "Проекты" ===== -->
+    <div id="tab-projects" class="tab-content active">
+        <div class="flex-between mb-2">
+            <h3>Список проектов</h3>
+            <button class="btn btn-primary" id="btn-add-project">+ Новый проект</button>
+        </div>
+        <div id="project-list"></div>
+    </div>
+
+    <!-- ===== Вкладка "Доходы/Расходы" ===== -->
+    <div id="tab-transactions" class="tab-content">
+        <div class="grid-2">
+            <!-- Доходы -->
+            <div class="card">
+                <h3>⬆️ Добавить доход</h3>
+                <label>Проект</label>
+                <select id="income-project"></select>
+
+                <label>Статья дохода</label>
+                <select id="income-article"></select>
+
+                <!-- Блок добавления новой статьи (доход) -->
+                <div class="custom-article-block">
+                    <label for="income-article-custom">➕ Новая статья</label>
+                    <input type="text" id="income-article-custom" placeholder="Например: «Лицензия»" style="flex:1;">
+                    <button class="btn btn-outline btn-sm" id="btn-add-income-article">Добавить</button>
+                    <div class="hint">Введите название и нажмите «Добавить», чтобы создать новую статью</div>
+                </div>
+
+                <hr class="separator">
+
+                <label for="income-amount">Сумма (₽)</label>
+                <input type="number" id="income-amount" placeholder="Введите сумму" min="0" step="1">
+                <button class="btn btn-success mt-2" id="btn-add-income">Добавить доход</button>
+            </div>
+
+            <!-- Расходы -->
+            <div class="card">
+                <h3>⬇️ Добавить расход</h3>
+                <label>Проект</label>
+                <select id="expense-project"></select>
+
+                <label>Статья расхода</label>
+                <select id="expense-article">
+                    <option value="Внешние программисты">Внешние программисты</option>
+                    <option value="Внутренние программисты">Внутренние программисты</option>
+                    <option value="Расходы на ИИ">Расходы на ИИ</option>
+                    <option value="Аренда сервера">Аренда сервера</option>
+                    <option value="Дивиденды">Дивиденды</option>
+                </select>
+
+                <!-- Блок добавления новой статьи (расход) -->
+                <div class="custom-article-block">
+                    <label for="expense-article-custom">➕ Новая статья</label>
+                    <input type="text" id="expense-article-custom" placeholder="Например: «Офисные расходы»" style="flex:1;">
+                    <button class="btn btn-outline btn-sm" id="btn-add-expense-article">Добавить</button>
+                    <div class="hint">Введите название и нажмите «Добавить», чтобы создать новую статью</div>
+                </div>
+
+                <hr class="separator">
+
+                <label for="expense-amount">Сумма (₽)</label>
+                <input type="number" id="expense-amount" placeholder="Введите сумму" min="0" step="1">
+                <button class="btn btn-danger mt-2" id="btn-add-expense">Добавить расход</button>
+            </div>
+        </div>
+
+        <!-- Все операции -->
+        <div class="card mt-3">
+            <div class="flex-between mb-1">
+                <h3 style="margin:0;">📋 Все операции</h3>
+                <div class="inline-flex">
+                    <label style="margin:0;font-weight:400;">Фильтр по проекту:</label>
+                    <select id="filter-project" style="width:auto;padding:6px 12px;"></select>
+                </div>
+            </div>
+            <div id="transaction-list"></div>
+        </div>
+    </div>
+
+    <!-- ===== Вкладка "Дашборд" ===== -->
+    <div id="tab-dashboard" class="tab-content">
+        <div class="flex-between mb-2">
+            <h3>📊 Сводка по проектам</h3>
+            <div class="inline-flex">
+                <button class="btn btn-success btn-sm" id="btn-export-excel">📊 Экспорт Excel</button>
+                <button class="btn btn-primary btn-sm" id="btn-export-data">💾 Экспорт JSON</button>
+                <button class="btn btn-outline btn-sm" id="btn-import-data">📂 Импорт JSON</button>
+                <input type="file" id="import-file-input" accept=".json" style="display:none;">
+            </div>
+        </div>
+
+        <div id="monthly-summary" class="monthly-summary"></div>
+
+        <div id="dashboard-container"></div>
+
+        <div class="chart-container">
+            <div class="flex-between">
+                <h4>📈 Динамика доходов и расходов по месяцам</h4>
+                <div class="inline-flex">
+                    <label style="margin:0;font-weight:400;">Проект:</label>
+                    <select id="chart-project-select" style="width:auto;padding:6px 12px;">
+                        <option value="all">Все проекты</option>
+                    </select>
+                </div>
+            </div>
+            <canvas id="financeChart"></canvas>
+        </div>
+
+        <div class="chart-row">
+            <div class="chart-box">
+                <h5>⬆️ Распределение доходов по статьям</h5>
+                <canvas id="pieIncomeChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h5>⬇️ Распределение расходов по статьям</h5>
+                <canvas id="pieExpenseChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Модальное окно для создания проекта ===== -->
+<div class="modal-overlay" id="projectModal">
+    <div class="modal">
+        <h2>➕ Новый проект</h2>
+        <div class="form-group">
+            <label for="projectNameInput">Название проекта</label>
+            <input type="text" id="projectNameInput" placeholder="Введите название">
+        </div>
+        <div class="form-group">
+            <label for="projectManagerInput">Руководитель проекта</label>
+            <input type="text" id="projectManagerInput" placeholder="ФИО руководителя">
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-outline" id="modalCancelBtn">Отмена</button>
+            <button class="btn btn-primary" id="modalSaveBtn">Создать</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    //  ДАННЫЕ (localStorage)
+    // ============================================================
+    const STORAGE_KEY = 'financeAppData';
+    let data = loadData();
+    let chartInstance = null;
+    let pieIncomeInstance = null;
+    let pieExpenseInstance = null;
+
+    function defaultData() {
+        return {
+            projects: [],
+            incomeArticles: ['Разработка', 'Внедрение', 'Консультация', 'Тестирование', 'Аналитика', 'Сопровождение', 'Обучение'],
+            expenseArticles: ['Внешние программисты','Внутренние программисты','Расходы на ИИ','Аренда сервера','Дивиденды'],
+            incomes: [],
+            expenses: [],
+            nextId: 1
+        };
+    }
+
+    function loadData() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                parsed.incomeArticles = defaultData().incomeArticles;
+                if (!parsed.expenseArticles) parsed.expenseArticles = defaultData().expenseArticles;
+                if (!parsed.nextId) parsed.nextId = 1;
+                return parsed;
+            }
+        } catch(e) {}
+        return defaultData();
+    }
+
+    function saveData() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function genId() { return data.nextId++; }
+
+    // ============================================================
+    //  ВСПОМОГАТЕЛЬНЫЕ
+    // ============================================================
+    function getProject(id) { return data.projects.find(p => p.id === id); }
+    function getProjectName(id) { const p = getProject(id); return p ? p.name : '❌ Удалён'; }
+    function getIncomesForProject(projectId) { return data.incomes.filter(inc => inc.projectId === projectId); }
+    function getExpensesForProject(projectId) { return data.expenses.filter(exp => exp.projectId === projectId); }
+    function sumIncomes(projectId) { return getIncomesForProject(projectId).reduce((s, i) => s + Number(i.amount), 0); }
+    function sumExpenses(projectId) { return getExpensesForProject(projectId).reduce((s, e) => s + Number(e.amount), 0); }
+    function profit(projectId) { return sumIncomes(projectId) - sumExpenses(projectId); }
+    function profitability(projectId) {
+        const exp = sumExpenses(projectId);
+        if (exp === 0) return 0;
+        return (profit(projectId) / exp) * 100;
+    }
+    function formatCurrency(amount) { return Number(amount).toLocaleString('ru-RU') + ' ₽'; }
+    function formatPercent(value) { return value.toFixed(1) + '%'; }
+
+    // ============================================================
+    //  ФУНКЦИИ ДЛЯ РАБОТЫ С ДАТАМИ
+    // ============================================================
+    function parseDate(dateStr) {
+        if (!dateStr) return null;
+        const parts = dateStr.split('.');
+        if (parts.length !== 3) return null;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        return new Date(year, month, day);
+    }
+
+    function getCurrentMonthYear() {
+        const now = new Date();
+        return { month: now.getMonth(), year: now.getFullYear() };
+    }
+
+    // ============================================================
+    //  СИНХРОНИЗАЦИЯ ВЫБОРА ПРОЕКТА (ГЛОБАЛЬНАЯ)
+    // ============================================================
+    function syncProjectSelects(changedSelectId) {
+        const selects = {
+            income: document.getElementById('income-project'),
+            expense: document.getElementById('expense-project'),
+            filter: document.getElementById('filter-project'),
+            chart: document.getElementById('chart-project-select')
+        };
+
+        let value = null;
+        let sourceId = null;
+        if (changedSelectId === 'income-project') {
+            value = selects.income.value;
+            sourceId = 'income';
+        } else if (changedSelectId === 'expense-project') {
+            value = selects.expense.value;
+            sourceId = 'expense';
+        } else if (changedSelectId === 'filter-project') {
+            value = selects.filter.value;
+            sourceId = 'filter';
+        } else if (changedSelectId === 'chart-project-select') {
+            value = selects.chart.value;
+            sourceId = 'chart';
+        }
+
+        if (!value) return;
+        if (sourceId === 'chart' && value === 'all') return;
+        if (value !== 'all' && !data.projects.some(p => p.id == value)) return;
+
+        if (sourceId !== 'income') selects.income.value = value;
+        if (sourceId !== 'expense') selects.expense.value = value;
+        if (sourceId !== 'filter') selects.filter.value = value;
+        if (sourceId !== 'chart') selects.chart.value = value;
+
+        if (sourceId === 'income' || sourceId === 'expense' || sourceId === 'filter') {
+            renderTransactions();
+        }
+        if (sourceId === 'income' || sourceId === 'expense' || sourceId === 'chart' || sourceId === 'filter') {
+            const projectSelect = document.getElementById('chart-project-select');
+            renderChart(projectSelect.value);
+            renderPieCharts(projectSelect.value);
+        }
+    }
+
+    document.getElementById('income-project').addEventListener('change', function() {
+        syncProjectSelects('income-project');
+    });
+    document.getElementById('expense-project').addEventListener('change', function() {
+        syncProjectSelects('expense-project');
+    });
+    document.getElementById('filter-project').addEventListener('change', function() {
+        syncProjectSelects('filter-project');
+    });
+    document.getElementById('chart-project-select').addEventListener('change', function() {
+        syncProjectSelects('chart-project-select');
+    });
+
+    // ============================================================
+    //  ЭКСПОРТ / ИМПОРТ
+    // ============================================================
+    function exportToExcel() {
+        if (data.projects.length === 0) {
+            alert('Нет данных для экспорта');
+            return;
+        }
+        const projectRows = data.projects.map(p => ({
+            'ID': p.id,
+            'Название': p.name,
+            'Сотрудники': p.employees ? p.employees.join(', ') : '',
+            'Доходы (₽)': sumIncomes(p.id),
+            'Расходы (₽)': sumExpenses(p.id),
+            'Прибыль (₽)': profit(p.id),
+            'Рентабельность (%)': profitability(p.id)
+        }));
+        const incomeRows = data.incomes.map(i => ({
+            'ID': i.id,
+            'Проект': getProjectName(i.projectId),
+            'Статья': i.article,
+            'Сумма (₽)': i.amount,
+            'Дата': i.date || ''
+        }));
+        const expenseRows = data.expenses.map(e => ({
+            'ID': e.id,
+            'Проект': getProjectName(e.projectId),
+            'Статья': e.article,
+            'Сумма (₽)': e.amount,
+            'Дата': e.date || ''
+        }));
+        const wb = XLSX.utils.book_new();
+        const ws1 = XLSX.utils.json_to_sheet(projectRows);
+        XLSX.utils.book_append_sheet(wb, ws1, 'Проекты');
+        const ws2 = XLSX.utils.json_to_sheet(incomeRows);
+        XLSX.utils.book_append_sheet(wb, ws2, 'Доходы');
+        const ws3 = XLSX.utils.json_to_sheet(expenseRows);
+        XLSX.utils.book_append_sheet(wb, ws3, 'Расходы');
+        XLSX.writeFile(wb, `Финансовый_учёт_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+    document.getElementById('btn-export-excel').addEventListener('click', exportToExcel);
+
+    function exportData() {
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `finance_data_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+    document.getElementById('btn-export-data').addEventListener('click', exportData);
+
+    function importData(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const imported = JSON.parse(e.target.result);
+                if (!imported.projects || !imported.incomes || !imported.expenses) {
+                    alert('Некорректный файл.');
+                    return;
+                }
+                if (!confirm('Импорт заменит все текущие данные. Продолжить?')) return;
+                data = imported;
+                data.incomeArticles = defaultData().incomeArticles;
+                if (!data.expenseArticles) data.expenseArticles = defaultData().expenseArticles;
+                if (!data.nextId) data.nextId = 1;
+                saveData();
+                renderAll();
+                alert('Данные успешно импортированы!');
+            } catch(err) {
+                alert('Ошибка чтения файла: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+    document.getElementById('btn-import-data').addEventListener('click', function() {
+        document.getElementById('import-file-input').click();
+    });
+    document.getElementById('import-file-input').addEventListener('change', function(e) {
+        if (this.files && this.files[0]) {
+            importData(this.files[0]);
+        }
+        this.value = '';
+    });
+
+    // ============================================================
+    //  МОДАЛЬНОЕ ОКНО ДЛЯ СОЗДАНИЯ ПРОЕКТА
+    // ============================================================
+    const modal = document.getElementById('projectModal');
+    const nameInput = document.getElementById('projectNameInput');
+    const managerInput = document.getElementById('projectManagerInput');
+    const saveBtn = document.getElementById('modalSaveBtn');
+    const cancelBtn = document.getElementById('modalCancelBtn');
+
+    function openModal() {
+        modal.classList.add('active');
+        nameInput.value = '';
+        managerInput.value = '';
+        nameInput.focus();
+    }
+
+    function closeModal() {
+        modal.classList.remove('active');
+    }
+
+    function createProjectFromModal() {
+        const name = nameInput.value.trim();
+        const manager = managerInput.value.trim();
+        if (!name) {
+            alert('Введите название проекта');
+            return;
+        }
+        if (!manager) {
+            alert('Введите руководителя проекта');
+            return;
+        }
+        const newProject = {
+            id: genId(),
+            name: name,
+            employees: [manager]
+        };
+        data.projects.push(newProject);
+        saveData();
+        closeModal();
+        renderAll();
+
+        const projectId = newProject.id;
+        document.getElementById('income-project').value = projectId;
+        document.getElementById('expense-project').value = projectId;
+        document.getElementById('filter-project').value = projectId;
+        document.getElementById('chart-project-select').value = projectId;
+        renderTransactions();
+        const projectSelect = document.getElementById('chart-project-select');
+        renderChart(projectSelect.value);
+        renderPieCharts(projectSelect.value);
+    }
+
+    document.getElementById('btn-add-project').addEventListener('click', openModal);
+    saveBtn.addEventListener('click', createProjectFromModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('active')) closeModal();
+    });
+    nameInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            managerInput.focus();
+        }
+    });
+    managerInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            createProjectFromModal();
+        }
+    });
+
+    // ============================================================
+    //  ОТРИСОВКА ПРОЕКТОВ (на вкладке "Проекты")
+    // ============================================================
+    function renderProjects() {
+        const container = document.getElementById('project-list');
+        if (data.projects.length === 0) {
+            container.innerHTML = `<div class="empty-state">Пока нет проектов. Создайте первый!</div>`;
+            return;
+        }
+        let html = '';
+        data.projects.forEach(p => {
+            const inc = sumIncomes(p.id);
+            const exp = sumExpenses(p.id);
+            const prof = profit(p.id);
+            const profClass = prof >= 0 ? 'profit-positive' : 'profit-negative';
+            const employees = p.employees && p.employees.length ? p.employees.join(', ') : '—';
+            html += `
+                <div class="card mb-2" style="background:white;">
+                    <div class="flex-between">
+                        <div>
+                            <strong style="font-size:18px;">${p.name}</strong>
+                            <span class="badge" style="margin-left:12px;">👤 ${employees}</span>
+                        </div>
+                        <div class="row-actions">
+                            <button class="btn btn-sm btn-outline" onclick="editProject(${p.id})">✏️</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">🗑️</button>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:20px; flex-wrap:wrap; margin-top:8px; font-size:14px;">
+                        <span>💰 Доходы: <strong>${formatCurrency(inc)}</strong></span>
+                        <span>💸 Расходы: <strong>${formatCurrency(exp)}</strong></span>
+                        <span class="${profClass}">📊 Прибыль: <strong>${formatCurrency(prof)}</strong></span>
+                        <span>📈 Рентабельность: <strong>${formatPercent(profitability(p.id))}</strong></span>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    window.editProject = function(id) {
+        const project = getProject(id);
+        if (!project) return;
+        const newName = prompt('Изменить название проекта:', project.name);
+        if (newName && newName.trim() !== '') project.name = newName.trim();
+        const empInput = prompt('Изменить список сотрудников (через запятую):', project.employees ? project.employees.join(', ') : '');
+        if (empInput !== null) {
+            project.employees = empInput.split(',').map(s => s.trim()).filter(s => s);
+        }
+        saveData();
+        renderAll();
+    };
+
+    window.deleteProject = function(id) {
+        if (!confirm('Удалить проект и все связанные операции?')) return;
+        data.projects = data.projects.filter(p => p.id !== id);
+        data.incomes = data.incomes.filter(i => i.projectId !== id);
+        data.expenses = data.expenses.filter(e => e.projectId !== id);
+        saveData();
+        renderAll();
+    };
+
+    // ============================================================
+    //  ДОХОДЫ / РАСХОДЫ
+    // ============================================================
+    function populateProjectSelects() {
+        const selects = ['income-project', 'expense-project', 'filter-project', 'chart-project-select'];
+        selects.forEach(id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const currentVal = sel.value;
+            sel.innerHTML = '';
+            if (id === 'chart-project-select') {
+                const optAll = document.createElement('option');
+                optAll.value = 'all';
+                optAll.textContent = 'Все проекты';
+                sel.appendChild(optAll);
+            }
+            data.projects.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                sel.appendChild(opt);
+            });
+            if (data.projects.length === 0 && id !== 'chart-project-select') {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '— нет проектов —';
+                sel.appendChild(opt);
+            }
+            if (currentVal && (currentVal === 'all' || data.projects.some(p => p.id == currentVal))) {
+                sel.value = currentVal;
+            } else if (id === 'chart-project-select') {
+                sel.value = 'all';
+            } else if (data.projects.length) {
+                sel.value = data.projects[0].id;
+            }
+        });
+    }
+
+    function populateIncomeArticles() {
+        const sel = document.getElementById('income-article');
+        const current = sel.value;
+        sel.innerHTML = '';
+        data.incomeArticles.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a;
+            opt.textContent = a;
+            sel.appendChild(opt);
+        });
+        if (current && data.incomeArticles.includes(current)) sel.value = current;
+    }
+
+    function populateExpenseArticles() {
+        const sel = document.getElementById('expense-article');
+        const current = sel.value;
+        sel.innerHTML = '';
+        const all = ['Внешние программисты','Внутренние программисты','Расходы на ИИ','Аренда сервера','Дивиденды'];
+        const custom = data.expenseArticles.filter(a => !all.includes(a));
+        [...all, ...custom].forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a;
+            opt.textContent = a;
+            sel.appendChild(opt);
+        });
+        if (current && [...all, ...custom].includes(current)) sel.value = current;
+    }
+
+    // Обработчики добавления статей с автовыбором и очисткой поля
+    document.getElementById('btn-add-income-article').addEventListener('click', function() {
+        const input = document.getElementById('income-article-custom');
+        const val = input.value.trim();
+        if (!val) return alert('Введите название новой статьи');
+        if (!data.incomeArticles.includes(val)) {
+            data.incomeArticles.push(val);
+            saveData();
+            populateIncomeArticles();
+            document.getElementById('income-article').value = val;
+            input.value = '';
+            // Переместить фокус на поле суммы
+            document.getElementById('income-amount').focus();
+        } else {
+            alert('Такая статья уже есть');
+            document.getElementById('income-article').value = val;
+            input.value = '';
+            document.getElementById('income-amount').focus();
+        }
+    });
+
+    document.getElementById('btn-add-expense-article').addEventListener('click', function() {
+        const input = document.getElementById('expense-article-custom');
+        const val = input.value.trim();
+        if (!val) return alert('Введите название новой статьи');
+        if (!data.expenseArticles.includes(val)) {
+            data.expenseArticles.push(val);
+            saveData();
+            populateExpenseArticles();
+            document.getElementById('expense-article').value = val;
+            input.value = '';
+            document.getElementById('expense-amount').focus();
+        } else {
+            alert('Такая статья уже есть');
+            document.getElementById('expense-article').value = val;
+            input.value = '';
+            document.getElementById('expense-amount').focus();
+        }
+    });
+
+    // Добавление дохода/расхода
+    document.getElementById('btn-add-income').addEventListener('click', function() {
+        const projectId = Number(document.getElementById('income-project').value);
+        const article = document.getElementById('income-article').value;
+        const amount = parseFloat(document.getElementById('income-amount').value);
+        if (!projectId || !data.projects.some(p => p.id === projectId)) return alert('Выберите проект');
+        if (!article) return alert('Выберите статью');
+        if (isNaN(amount) || amount <= 0) return alert('Введите корректную сумму');
+        data.incomes.push({ id: genId(), projectId, article, amount, date: new Date().toLocaleDateString('ru-RU') });
+        saveData();
+        document.getElementById('income-amount').value = '';
+        renderAll();
+        document.getElementById('income-amount').focus();
+    });
+
+    document.getElementById('btn-add-expense').addEventListener('click', function() {
+        const projectId = Number(document.getElementById('expense-project').value);
+        const article = document.getElementById('expense-article').value;
+        const amount = parseFloat(document.getElementById('expense-amount').value);
+        if (!projectId || !data.projects.some(p => p.id === projectId)) return alert('Выберите проект');
+        if (!article) return alert('Выберите статью');
+        if (isNaN(amount) || amount <= 0) return alert('Введите корректную сумму');
+        data.expenses.push({ id: genId(), projectId, article, amount, date: new Date().toLocaleDateString('ru-RU') });
+        saveData();
+        document.getElementById('expense-amount').value = '';
+        renderAll();
+        document.getElementById('expense-amount').focus();
+    });
+
+    // ============================================================
+    //  СПИСОК ОПЕРАЦИЙ (АВТООБНОВЛЕНИЕ)
+    // ============================================================
+    function renderTransactions() {
+        const container = document.getElementById('transaction-list');
+        const filterProject = Number(document.getElementById('filter-project').value);
+        let incomes = data.incomes.map(i => ({ ...i, type: 'Доход' }));
+        let expenses = data.expenses.map(e => ({ ...e, type: 'Расход' }));
+        let all = [...incomes, ...expenses];
+        if (filterProject) {
+            all = all.filter(item => item.projectId === filterProject);
+        }
+        all.sort((a, b) => b.id - a.id);
+        if (all.length === 0) {
+            container.innerHTML = `<div class="empty-state">Нет операций</div>`;
+            return;
+        }
+        let html = `<table><thead><tr><th>Тип</th><th>Проект</th><th>Статья</th><th>Сумма</th><th>Дата</th><th></th></tr></thead><tbody>`;
+        all.forEach(item => {
+            const isIncome = item.type === 'Доход';
+            html += `<tr>
+                <td><span class="badge ${isIncome ? 'badge-success' : 'badge-danger'}">${item.type}</span></td>
+                <td>${getProjectName(item.projectId)}</td>
+                <td>${item.article}</td>
+                <td>${formatCurrency(item.amount)}</td>
+                <td>${item.date || '—'}</td>
+                <td><button class="btn btn-sm btn-danger" onclick="deleteTransaction(${item.id}, '${item.type}')">✕</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    window.deleteTransaction = function(id, type) {
+        if (!confirm('Удалить операцию?')) return;
+        if (type === 'Доход') data.incomes = data.incomes.filter(i => i.id !== id);
+        else data.expenses = data.expenses.filter(e => e.id !== id);
+        saveData();
+        renderAll();
+    };
+
+    // ============================================================
+    //  БЛОК ИТОГОВ ЗА ТЕКУЩИЙ МЕСЯЦ
+    // ============================================================
+    function renderMonthlySummary() {
+        const container = document.getElementById('monthly-summary');
+        const currentMonth = getCurrentMonthYear();
+        let totalIncome = 0;
+        let totalExpense = 0;
+
+        data.incomes.forEach(inc => {
+            const date = parseDate(inc.date);
+            if (date && date.getFullYear() === currentMonth.year && date.getMonth() === currentMonth.month) {
+                totalIncome += Number(inc.amount);
+            }
+        });
+
+        data.expenses.forEach(exp => {
+            const date = parseDate(exp.date);
+            if (date && date.getFullYear() === currentMonth.year && date.getMonth() === currentMonth.month) {
+                totalExpense += Number(exp.amount);
+            }
+        });
+
+        const profitMonth = totalIncome - totalExpense;
+        const profitClass = profitMonth >= 0 ? 'profit-positive' : 'profit-negative';
+
+        const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+        const monthName = monthNames[currentMonth.month];
+
+        container.innerHTML = `
+            <div class="stat-card">
+                <div class="label">📈 Доходы за ${monthName}</div>
+                <div class="value" style="color:#1d9b5d;">${formatCurrency(totalIncome)}</div>
+                <div class="sub">по всем проектам</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">📉 Расходы за ${monthName}</div>
+                <div class="value" style="color:#e14a4a;">${formatCurrency(totalExpense)}</div>
+                <div class="sub">по всем проектам</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">💹 Прибыль за ${monthName}</div>
+                <div class="value ${profitClass}">${formatCurrency(profitMonth)}</div>
+                <div class="sub">${profitMonth >= 0 ? '🟢 положительная' : '🔴 отрицательная'}</div>
+            </div>
+        `;
+    }
+
+    // ============================================================
+    //  ДАШБОРД (СЕТКА С НЕСКОЛЬКИМИ КОЛОНКАМИ, ОДИН РЯД ВИДЕН)
+    // ============================================================
+    function renderDashboard() {
+        const container = document.getElementById('dashboard-container');
+        if (data.projects.length === 0) {
+            container.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Нет проектов</div>`;
+            return;
+        }
+        let html = '';
+        data.projects.forEach(p => {
+            const inc = sumIncomes(p.id);
+            const exp = sumExpenses(p.id);
+            const prof = profit(p.id);
+            const profClass = prof >= 0 ? 'profit-positive' : 'profit-negative';
+            const rent = profitability(p.id);
+            const manager = p.employees && p.employees.length ? p.employees[0] : '—';
+            html += `
+                <div class="project-card">
+                    <h3 title="${p.name}">${p.name}</h3>
+                    <div class="manager">👤 ${manager}</div>
+                    <div class="stat-grid">
+                        <div class="stat-card"><div class="label">Доходы</div><div class="value" style="color:#1d9b5d;">${formatCurrency(inc)}</div></div>
+                        <div class="stat-card"><div class="label">Расходы</div><div class="value" style="color:#e14a4a;">${formatCurrency(exp)}</div></div>
+                        <div class="stat-card"><div class="label">Прибыль</div><div class="value ${profClass}">${formatCurrency(prof)}</div></div>
+                        <div class="stat-card"><div class="label">Рентабельность</div><div class="value">${formatPercent(rent)}</div></div>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    // ============================================================
+    //  ГРАФИКИ
+    // ============================================================
+    function prepareChartData(projectId) {
+        let incomes = data.incomes;
+        let expenses = data.expenses;
+        if (projectId !== 'all') {
+            const pid = Number(projectId);
+            incomes = incomes.filter(i => i.projectId === pid);
+            expenses = expenses.filter(e => e.projectId === pid);
+        }
+        const months = {};
+        const allOps = [...incomes.map(i => ({ ...i, type: 'income' })), ...expenses.map(e => ({ ...e, type: 'expense' }))];
+        allOps.forEach(op => {
+            const parts = op.date ? op.date.split('.') : null;
+            if (!parts || parts.length !== 3) return;
+            const month = parts[1].padStart(2,'0');
+            const year = parts[2];
+            const key = `${year}-${month}`;
+            if (!months[key]) months[key] = { income: 0, expense: 0 };
+            if (op.type === 'income') months[key].income += Number(op.amount);
+            else months[key].expense += Number(op.amount);
+        });
+        const sorted = Object.keys(months).sort();
+        const monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+        const labels = sorted.map(k => {
+            const [y,m] = k.split('-');
+            return `${monthNames[parseInt(m)-1]} ${y}`;
+        });
+        const incomeData = sorted.map(k => months[k].income);
+        const expenseData = sorted.map(k => months[k].expense);
+        return { labels, incomeData, expenseData };
+    }
+
+    function renderChart(projectId) {
+        const ctx = document.getElementById('financeChart').getContext('2d');
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        const chartData = prepareChartData(projectId);
+        if (chartData.labels.length === 0) {
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: ['Нет данных'], datasets: [
+                    { label: 'Доходы', data: [0], backgroundColor: 'rgba(29,155,93,0.6)' },
+                    { label: 'Расходы', data: [0], backgroundColor: 'rgba(225,74,74,0.6)' }
+                ]},
+                options: { responsive: true, plugins: { legend: { position: 'top' }, title: { display: true, text: 'Нет операций' } } }
+            });
+            return;
+        }
+        chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.labels,
+                datasets: [
+                    { label: 'Доходы', data: chartData.incomeData, backgroundColor: 'rgba(29,155,93,0.7)', borderColor: 'rgba(29,155,93,1)', borderWidth: 1 },
+                    { label: 'Расходы', data: chartData.expenseData, backgroundColor: 'rgba(225,74,74,0.7)', borderColor: 'rgba(225,74,74,1)', borderWidth: 1 }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: { callbacks: { label: function(context) { return context.dataset.label + ': ' + formatCurrency(context.raw); } } }
+                },
+                scales: { y: { beginAtZero: true, ticks: { callback: function(value) { return value.toLocaleString('ru-RU') + ' ₽'; } } } }
+            }
+        });
+    }
+
+    function renderPieCharts(projectId) {
+        let incomes = data.incomes;
+        let expenses = data.expenses;
+        if (projectId !== 'all') {
+            const pid = Number(projectId);
+            incomes = incomes.filter(i => i.projectId === pid);
+            expenses = expenses.filter(e => e.projectId === pid);
+        }
+        const incomeMap = {};
+        incomes.forEach(i => { incomeMap[i.article] = (incomeMap[i.article] || 0) + Number(i.amount); });
+        const incomeLabels = Object.keys(incomeMap);
+        const incomeValues = Object.values(incomeMap);
+
+        const expenseMap = {};
+        expenses.forEach(e => { expenseMap[e.article] = (expenseMap[e.article] || 0) + Number(e.amount); });
+        const expenseLabels = Object.keys(expenseMap);
+        const expenseValues = Object.values(expenseMap);
+
+        const colors = ['#2a7de1','#1d9b5d','#e14a4a','#f1c40f','#9b59b6','#e67e22','#1abc9c','#e84393'];
+
+        const ctxIncome = document.getElementById('pieIncomeChart').getContext('2d');
+        if (pieIncomeInstance) { pieIncomeInstance.destroy(); pieIncomeInstance = null; }
+        if (incomeLabels.length === 0) {
+            pieIncomeInstance = new Chart(ctxIncome, {
+                type: 'doughnut',
+                data: { labels: ['Нет данных'], datasets: [{ data: [1], backgroundColor: ['#e0e0e0'] }] },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            });
+        } else {
+            pieIncomeInstance = new Chart(ctxIncome, {
+                type: 'doughnut',
+                data: {
+                    labels: incomeLabels,
+                    datasets: [{ data: incomeValues, backgroundColor: colors.slice(0, incomeLabels.length) }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: { callbacks: { label: function(context) {
+                            const total = context.dataset.data.reduce((a,b) => a + b, 0);
+                            const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
+                            return context.label + ': ' + formatCurrency(context.raw) + ' (' + percentage + '%)';
+                        } } }
+                    }
+                }
+            });
+        }
+
+        const ctxExpense = document.getElementById('pieExpenseChart').getContext('2d');
+        if (pieExpenseInstance) { pieExpenseInstance.destroy(); pieExpenseInstance = null; }
+        if (expenseLabels.length === 0) {
+            pieExpenseInstance = new Chart(ctxExpense, {
+                type: 'doughnut',
+                data: { labels: ['Нет данных'], datasets: [{ data: [1], backgroundColor: ['#e0e0e0'] }] },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            });
+        } else {
+            pieExpenseInstance = new Chart(ctxExpense, {
+                type: 'doughnut',
+                data: {
+                    labels: expenseLabels,
+                    datasets: [{ data: expenseValues, backgroundColor: colors.slice(0, expenseLabels.length) }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: { callbacks: { label: function(context) {
+                            const total = context.dataset.data.reduce((a,b) => a + b, 0);
+                            const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
+                            return context.label + ': ' + formatCurrency(context.raw) + ' (' + percentage + '%)';
+                        } } }
+                    }
+                }
+            });
+        }
+    }
+
+    document.getElementById('chart-project-select').addEventListener('change', function() {
+        const val = this.value;
+        renderChart(val);
+        renderPieCharts(val);
+    });
+
+    // ============================================================
+    //  ОБЩАЯ ОТРИСОВКА
+    // ============================================================
+    function renderAll() {
+        populateProjectSelects();
+        populateIncomeArticles();
+        populateExpenseArticles();
+        renderProjects();
+        renderTransactions();
+        renderMonthlySummary();
+        renderDashboard();
+        const projectSelect = document.getElementById('chart-project-select');
+        renderChart(projectSelect.value);
+        renderPieCharts(projectSelect.value);
+    }
+
+    // ============================================================
+    //  ВКЛАДКИ
+    // ============================================================
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById(this.dataset.tab).classList.add('active');
+            if (this.dataset.tab === 'tab-dashboard') {
+                renderMonthlySummary();
+                renderDashboard();
+                const projectSelect = document.getElementById('chart-project-select');
+                renderChart(projectSelect.value);
+                renderPieCharts(projectSelect.value);
+            }
+            if (this.dataset.tab === 'tab-transactions') renderTransactions();
+            if (this.dataset.tab === 'tab-projects') renderProjects();
+        });
+    });
+
+    // ============================================================
+    //  ИНИЦИАЛИЗАЦИЯ
+    // ============================================================
+    renderAll();
+    console.log('✅ Приложение загружено. Данные в localStorage.');
+</script>
+</body>
+</html>
